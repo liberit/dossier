@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
-import sys, zipfile, xml.dom.minidom
+import sys, zipfile, xml.dom.minidom, re, json
 
 articlechilds=['Point 0', 'Point 0 (number)', 'Standard', 'Manual NumPar 1', 'NumPar 1', 'Manual Heading 4', 'Manual NumPar 2']
 paragraphkids=['Point 1', 'Point 1 (letter)', 'Text 1']
@@ -27,7 +27,7 @@ class Node:
             res= u"<%s [%s]>" % (self.title, nodes)
         else:
             res= u"<%s>" % self.title
-        return res
+        return res.encode('utf8')
 
     def add(self, node):
         # if last item is a list and this contains the same type as
@@ -52,6 +52,49 @@ class Node:
             if ind>0: print ' ' * (ind * 2),
             print self.title.encode('utf8')
         [x.dump(ind+1) for x in self.nodes]
+
+    def json(self):
+        return { 'title': self.title,
+                 'type': self.type,
+                 'kids': [x.json() for x in self.nodes]}
+
+    def html(self, li=u"<p>%s</p>"):
+        res=[]
+        kids=[]
+        for x in self.nodes:
+            if x.type in listtypes:
+                lit=u"<li class='%s'>%%s</li>" % u'-'.join(x.type.lower().split())
+            else:
+                lit=li
+            for y in x.html(lit):
+                kids.append(y)
+
+        if self.type!='list':
+            if self.type == 'article':
+                res.append(u"<h5 class='article' id='%s'>%s</h5>" %
+                           ('-'.join(self.title.lower().split(None,2)[:2]), self.title))
+            elif self.type == 'section':
+                res.append(u"<h4 class='section' id='%s'>%s</h4>" %
+                           ('-'.join(self.title.lower().split(None,2)[:2]), self.title))
+            else:
+                res.append(li % ("%s\n%s" % (self.title, u'\n'.join(kids))))
+                return res
+            if kids:
+                res.append(u'\n\t'.join(kids))
+        else:
+            if ' (letter)' in self.title:
+                res.extend(["<ol class='letter %s'>" % '-'.join(self.title.lower().split()),
+                            u'\n\t'.join(kids),
+                            "</ol>"])
+            elif ' (number)' in self.title:
+                res.extend(["<ol class='number %s'>" % '-'.join(self.title.lower().split()),
+                            u'\n\t'.join(kids),
+                            "</ol>"])
+            else:
+                res.extend(["<ul class='%s'>" % '-'.join(self.title.lower().split()),
+                            u'\n\t'.join(kids),
+                            "</ul>"])
+        return res
 
 class ODT:
     def __init__ (self, path) :
@@ -145,7 +188,9 @@ class ODT:
             elif stack:
                 #print style.encode('utf8')
                 if style in articlechilds:
-                    stack['list'] = stack['article'].add(Node(self.textToString(paragraph), style))
+                    tmp=Node(self.textToString(paragraph), style)
+                    stack['article'].nodes.append((tmp))
+                    stack['list'] = tmp
                 elif style in paragraphkids:
                     stack['list'].add(Node(self.textToString(paragraph), style))
                 else:
@@ -177,6 +222,39 @@ class ODT:
         print "Footnotes"
         for i, r in enumerate(self.footnotes):
             print (u"  (%s) %s" % (i+1,r)).encode('utf8')
+
+    def json(self):
+        return [{ 'title': c.title,
+                  'kids': [x.json() for x in c.nodes]}
+                for c in self.chaps]
+
+    def html(self):
+        res=[css]
+        res.append("<h2><span id='reference'>%s</span> <span id='title'>%s</span></h2>" %
+                   (self.ref, self.title))
+
+        res.extend(["<p class='preamble'>%s</p>" % p
+                    for p in self.preamble])
+
+        tmp=[u"<li class='recital' id='recital_%s'>%s</li>" % (i+1,r)
+             for i, r in enumerate(self.recitals)]
+        res.append("<ol class='number '>%s</ol>" % '\n'.join(tmp))
+
+        res.append("<p class='adoption'>%s</p>" % self.adoption)
+
+        for i, c in enumerate(self.chaps):
+            res.append("<h3 class='chapter' id='chapter%s'>%s</h3>" %
+                       (i+1, c.title))
+            res.append("<ol>")
+            for x in c.nodes:
+                res.extend(x.html())
+            res.append("</ol>")
+
+        res.append("<hr /><h3>Footnotes</h3>")
+        res.extend([u"<p class='footnote'><a name='footnote%s'>[%s] %s</a></p>" % (i+1, i+1 ,r[1])
+                    for i, r in enumerate(self.footnotes)])
+
+        return u'\n'.join(res).encode('utf8')
 
     def textToString(self, element):
         buffer = u""
@@ -216,9 +294,19 @@ class ODT:
                     link = node.getAttribute("xlink:href")
                     buffer += "[%s](%s)" % (text, link)
                 else: buffer += " "
-        return ' '.join(buffer.split())
+        return u' '.join(buffer.split())
 
+css="""
+<style>
+li { list-style: none outside none; margin: .8em; }
+li.number { list-style: decimal outside none; margin: .8em; }
+li.letter { list-style: lower-latin outside none; margin: .8em; }
+</style>
+"""
 if __name__ == "__main__" :
     odt = ODT(sys.argv[1])
     #odt.dump()
-    odt.html()
+    #for x in odt.chaps:
+    #    print >>sys.stderr, x
+    print odt.html()
+    #print json.dumps(odt.json(), indent=1, ensure_ascii=False).encode('utf8')
