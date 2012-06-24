@@ -58,29 +58,29 @@ class Node:
                  'type': self.type,
                  'kids': [x.json() for x in self.nodes]}
 
-    def html(self, li=u"<p>%s</p>"):
+    def html(self):
         res=[]
-        kids=[]
-        for x in self.nodes:
-            if x.type in listtypes:
-                lit=u"<li class='%s'>%%s</li>" % u'-'.join(x.type.lower().split())
-            else:
-                lit=li
-            for y in x.html(lit):
-                kids.append(y)
-
+        kids=[y for x in self.nodes for y in x.html()]
         if self.type!='list':
             if self.type == 'article':
                 res.append(u"<h5 class='article' id='%s'>%s</h5>" %
                            ('-'.join(self.title.lower().split(None,2)[:2]), self.title))
+                if kids:
+                    res.append(u"<ul class='paragraphs'>%s</ul>" % u'\n\t'.join(kids))
             elif self.type == 'section':
                 res.append(u"<h4 class='section' id='%s'>%s</h4>" %
                            ('-'.join(self.title.lower().split(None,2)[:2]), self.title))
+                if kids:
+                    res.append(u'\n\t'.join(kids))
+            elif self.type in listtypes:
+                res.append("<li class='%s'>%s\n%s</li>" % ('-'.join(self.type.lower().split()),
+                                                           self.title,
+                                                           u'\n'.join(kids)))
             else:
-                res.append(li % ("%s\n%s" % (self.title, u'\n'.join(kids))))
+                res.append("<p class='%s'>%s\n%s</p>" % ('-'.join(self.type.lower().split()),
+                                                         self.title,
+                                                         u'\n'.join(kids)))
                 return res
-            if kids:
-                res.append(u'\n\t'.join(kids))
         else:
             if ' (letter)' in self.title:
                 res.extend(["<ol class='letter %s'>" % '-'.join(self.title.lower().split()),
