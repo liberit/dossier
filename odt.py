@@ -5,6 +5,7 @@ import sys, zipfile, xml.dom.minidom, re, json
 articlechilds=['Point 0', 'Point 0 (number)', 'Standard', 'Manual NumPar 1', 'NumPar 1', 'Manual Heading 4', 'Manual NumPar 2']
 paragraphkids=['Point 1', 'Point 1 (letter)', 'Text 1']
 listtypes=['Point 0', 'Point 0 (number)', 'Manual NumPar 1', 'NumPar 1', 'Manual Heading 4', 'Manual NumPar 2', 'Point 1', 'Point 1 (letter)']
+numberlists=['NumPar 1']
 
 ## u"Default": "p",
 ## u"Fait à": "",
@@ -72,8 +73,19 @@ class Node:
                            ('-'.join(self.title.lower().split(None,2)[:2]), self.title))
                 if kids:
                     res.append(u'\n\t'.join(kids))
+            elif self.type in numberlists:
+                clss='-'.join(self.type.lower().split())
+                res.append("<li class='decimal %s'>%s\n%s</li>" % (clss,
+                                                           self.title,
+                                                           u'\n'.join(kids)))
             elif self.type in listtypes:
-                res.append("<li class='%s'>%s\n%s</li>" % ('-'.join(self.type.lower().split()),
+                if ' (letter)' in self.type:
+                    clss='letter'
+                elif ' (number)' in self.type:
+                    clss='number'
+                else:
+                    clss='-'.join(self.type.lower().split())
+                res.append("<li class='%s'>%s\n%s</li>" % (clss,
                                                            self.title,
                                                            u'\n'.join(kids)))
             else:
@@ -299,8 +311,25 @@ class ODT:
 css="""
 <style>
 li { list-style: none outside none; margin: .8em; }
-li.number { list-style: decimal outside none; margin: .8em; }
-li.letter { list-style: lower-latin outside none; margin: .8em; }
+ol {
+  counter-reset: list;
+}
+ol li {
+  list-style: none;
+}
+ol li.number:before,
+ol li.recital:before {
+  content: "(" counter(list, decimal) ") ";
+  counter-increment: list;
+}
+ol li.decimal:before {
+  content: counter(list, decimal) ". ";
+  counter-increment: list;
+}
+ol li.letter:before {
+  content: "(" counter(list, lower-latin) ") ";
+  counter-increment: list;
+}
 </style>
 """
 if __name__ == "__main__" :
