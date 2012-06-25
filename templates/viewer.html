@@ -1,0 +1,39 @@
+{% extends "base.html" %}
+
+{% block styles %}
+<link rel="stylesheet" type="text/css" href="{%media_url%}/css/annotator.min.css">
+{% endblock %}
+
+{% block scripts %}
+<script src="{%media_url%}/js/jquery.min.js"></script>
+<script src="{%media_url%}/js/json2.js"></script>
+<script src="{%media_url%}/js/annotator-full.min.js"></script>
+<script src="{%media_url%}/js/notes.js"></script>
+
+<script type="text/javascript">
+$(document).ready(function(){
+   $(function() {
+      var os = new Notes.Annotator($('#text-to-annotate'))
+      os.setCurrentUser('{{user}}')
+   });
+</script>
+{% endblock %}
+
+{% block content %}
+<h2 title="{{doc.title|safe}}">{{ doc.title|safe|truncatewords:10 }} ({{ doc.docid }})</h2>
+
+<br style="clear: both">
+
+<div id="text-to-annotate">
+{{ content|safe }}
+</div>
+
+<div id='tooltips'>
+{{tooltips|safe }}
+</div>
+
+{% endblock %}
+
+{% block other_content %}
+<div class="msgbox" id="msgbox"><div class="msgbox_close"> X </div><div id="msgbox_c"> </div></div>
+{% endblock %}
